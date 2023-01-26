@@ -1,5 +1,5 @@
 # duckpm
-A kinda bad way of doing package managing.
+A kinda ducky way of doing package managing.
 
 
 ## Contribution
