@@ -1,4 +1,4 @@
-const ver = "0.8.2";
+const ver = "0.9.0";
 const zlib = require('zlib');
 const util = require("util");
 const params = util.parseArgs({
@@ -127,6 +127,57 @@ if (!params.values.hideoem) console.info("[inf] ");
 			if (!params.values.noconfig && config.failedToLoad) return process.exit(1);
 			installpkg(params.positionals[1]);
 		}
+	} else if (params.positionals[0] == "cachepkg") {
+		console.info("[inf] Getting server package list...");
+		let parsed = {
+			package: params.positionals[1].split("@")[0],
+			version: params.positionals[1].split("@")[1]
+		};
+		if (!config.packageList || config.failedToLoad) {
+			packagelist = await fetch(config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/") + "list");
+			packagelist = await packagelist.json();
+			if (!config.failedToLoad) {
+				userconfig.packageList = packagelist;
+				reloadUserConfig(true);
+				fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
+			}
+		} else {
+			packagelist = config.packageList;
+			console.info("[inf] Using cached list, use duckpm update to update.")
+		}
+		if (!packagelist.hasOwnProperty(parsed.package)) {
+			console.error("[err] Couldn't find \"" + (parsed.package || "") + "\" on the server.");
+			return process.exit(1);
+		}
+		if (!packagelist[parsed.package].includes(parsed.version) && parsed.version) {
+			console.error("[err] Couldn't find version \"" + parsed.version + "\" of package \"" + (parsed.package || "") + "\" on the server, however there are other versions available.");
+			console.info("[inf] The available versions are: " + packagelist[parsed.package].join(", "));
+			return process.exit(1);
+		}
+		console.info("[inf] Caching " + params.positionals[1] + "...");
+		if (!config.failedToLoad) {
+			if (!config.cachedpackages || config.failedToLoad) {
+				let package;
+				package = await fetch(config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/") + "get?package=" + encodeURIComponent(parsed.package) + "&version=" + encodeURIComponent(parsed.version));
+				package = await package.arrayBuffer();
+				package = Buffer.from(new Uint8Array(package));
+				if (!config.failedToLoad) {
+					userconfig.cachedpackages = {};
+					userconfig.cachedpackages[parsed.package + "@" + parsed.version] = package.toString("base64");
+					reloadUserConfig(true);
+					if (!params.values.noinstall) fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
+				}
+			} else if (!config.cachedpackages.hasOwnProperty(parsed.package + "@" + parsed.version)) {
+				let package;
+				package = await fetch(config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/") + "get?package=" + encodeURIComponent(parsed.package) + "&version=" + encodeURIComponent(parsed.version));
+				package = await package.arrayBuffer();
+				package = Buffer.from(new Uint8Array(package));
+				userconfig.cachedpackages[parsed.package + "@" + parsed.version] = package.toString("base64");
+				reloadUserConfig(true);
+				if (!params.values.noinstall) fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
+			}
+		}
+		console.info("[inf] Cached successfully!");
 	} else if (params.positionals[0] == "remove" || params.positionals[0] == "delete" || params.positionals[0] == "del" || params.positionals[0] == "rm" || params.positionals[0] == "uninstall") {
 		if (params.values.itself) {
 			console.info("[inf] Removing \"duckpm@" + ver + "\"...");
@@ -280,6 +331,7 @@ if (!params.values.hideoem) console.info("[inf] ");
 		console.info("[inf]                                          there's no package list cache).");
 		console.info("[inf]        listdwnpkg                      - shows the packages that you");
 		console.info("[inf]                                          downloaded (may be not installed)");
+		console.info("[inf]        cachepkg [package]              - caches the specified package");
 		console.info("[inf]        noop                            - don't do anything");
 		console.info("[inf]                          --quiet       - Program-wide setting to remove");
 		console.info("[inf]                                          all console interaction");
