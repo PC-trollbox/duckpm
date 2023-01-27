@@ -1,4 +1,4 @@
-const ver = "0.8.1";
+const ver = "0.8.2";
 const zlib = require('zlib');
 const util = require("util");
 const params = util.parseArgs({
@@ -133,7 +133,7 @@ if (!params.values.hideoem) console.info("[inf] ");
 			if (config.failedToLoad) {
 				console.log("No need to remove the config: couldn't load one.");
 			} else {
-				fs.rmSync(__dirname + "/duckpm-global-config.json", );
+				fs.rmSync(__dirname + "/duckpm-global-config.json");
 				fs.rmSync(os.homedir() + "/.duckpm-local-config.json");
 				console.log("The configs were removed.");
 			}
@@ -331,7 +331,7 @@ async function installpkg(pkg, quiet = false) {
 			userconfig.cachedpackages = {};
 			userconfig.cachedpackages[parsed.package + "@" + parsed.version] = package.toString("base64");
 			reloadUserConfig(true);
-			fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
+			if (!params.values.noinstall) fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
 		}
 	} else if (!config.cachedpackages.hasOwnProperty(parsed.package + "@" + parsed.version)) {
 		package = await fetch(config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/") + "get?package=" + encodeURIComponent(parsed.package) + "&version=" + encodeURIComponent(parsed.version));
@@ -339,7 +339,7 @@ async function installpkg(pkg, quiet = false) {
 		package = Buffer.from(new Uint8Array(package));
 		userconfig.cachedpackages[parsed.package + "@" + parsed.version] = package.toString("base64");
 		reloadUserConfig(true);
-		fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
+		if (!params.values.noinstall) fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
 	} else {
 		iscache = true;
 		package = Buffer.from(config.cachedpackages[parsed.package + "@" + parsed.version], "base64");
