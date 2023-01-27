@@ -1,0 +1,8 @@
+#!/bin/bash
+echo Hello!
+echo This is a test program.
+echo "Testing dependency \"mypkgs\":"
+cat dependency
+if [[ "$?" == "0" ]]; then
+    echo "Everything is fine. We still have consistency."; 
+fi

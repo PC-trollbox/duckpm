@@ -1,0 +1,12 @@
+{
+    "preinstall": "console.warn('This package is a beta version!');",
+    "postinstall": "console.log('This package has been installed, phew...');",
+    "preremove": "console.warn('You\\'re removing a beta version automatically. You should do it manually as there can be bugs in the uninstaller')",
+    "postremove": "console.log('Phew, it still works...')",
+    "programMaps": [
+        "c"
+    ],
+    "dependencies": [
+        "mypkgs@0.0.2"
+    ]
+}

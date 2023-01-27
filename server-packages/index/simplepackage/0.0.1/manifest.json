@@ -1,0 +1,4 @@
+{
+    "preinstall": "console.log('This package is about to get installed.');",
+    "postinstall": "console.log('This package has been installed!');"
+}
