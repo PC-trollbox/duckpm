@@ -1,4 +1,4 @@
-const ver = "0.8.0";
+const ver = "0.8.1";
 const zlib = require('zlib');
 const util = require("util");
 const params = util.parseArgs({
@@ -71,7 +71,7 @@ async function unhandleFolders(path, objects) {
 	if (!path) return "";
 	for (let object of objects) {
 		if (typeof objects[object] == "object") {
-			await handleFolders(`${path}/${object}`, objects[object]);
+			await unhandleFolders(`${path}/${object}`, objects[object]);
 		} else {
 			fs.rmSync(`${path}/${object}`, {
 				recursive: true,
