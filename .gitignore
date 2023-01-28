@@ -1,4 +1,4 @@
-# This is very a gitignore with recommended protections.
+# This is a gitignore with recommended protections.
 server-packages/package.json
 server-packages/package-lock.json
 server-packages/node_modules
