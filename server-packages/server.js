@@ -5,6 +5,8 @@ const zlib = require('zlib');
 const express = require('express');
 const fs = require("fs");
 const app = express();
+let concatservers = []; //Specify servers to concatenate. The concatenated servers' index will be merged into this server and packages from them will be
+						//made available. Some remote packages may get overriden.
 
 async function createFS(path) {
     let fileSystem = {};
@@ -25,8 +27,17 @@ app.get('/', (req, res) => {
 app.get("/quack/", (req, res) => {
 	res.status(400).send("Invalid request: must specify an action (list or get).");
 });
-app.get("/quack/list", (req, res) => {
+app.get("/quack/list", async (req, res) => {
 	let fulllist = {};
+	if (concatservers.length) {
+		for (let concatsrv of concatservers) {
+			let list = await fetch(`${concatsrv.endsWith("/") ? concatsrv : `${concatsrv}/`}list`);
+			list = await list.json();
+			for (let pkg of list) {
+				fulllist[pkg] = list[pkg];
+			}
+		}
+	}
 	let pkglist = fs.readdirSync("./index/");
 	for (let pkg of pkglist) {
 		fulllist[pkg] = fs.readdirSync("./index/" + pkg + "/");
@@ -42,7 +53,16 @@ app.get("/quack/get", async (req, res) => {
 		let endManifest = { ...manifest, files: concat };
 		res.send(zlib.deflateSync(Buffer.from(JSON.stringify(endManifest))));
 	} else {
-		res.end();
+		if (concatservers.length) {
+			for (let concatsrv of concatservers) {
+				let list = await fetch(`${concatsrv.endsWith("/") ? concatsrv : `${concatsrv}/`}get?package=${encodeURIComponent(req.query.package)}&version=${encodeURIComponent(req.query.version)}`);
+				if (!list.ok) continue;
+				return res.send(await list.text());
+			}
+			res.status(404).send("Invalid request: specified package wasn't found.");
+		} else {
+			res.status(404).send("Invalid request: specified package wasn't found.");
+		}
 	}
 });
 
