@@ -1,6 +1,6 @@
 #!/bin/node
 
-const ver = "0.10.2";
+const ver = "0.11.0";
 const zlib = require('zlib');
 const util = require("util");
 const params = util.parseArgs({
@@ -60,7 +60,9 @@ async function handleFolders(path, objects) {
 		fs.mkdirSync(path);
 	} catch {}
 	for (let object in objects) {
+		if (params.values.loghandled) console.info("[inf]", object, "writing to", path);
 		if (typeof objects[object] == "object") {
+			if (params.values.loghandled) console.info("[inf]", object, "will be a folder in", path);
 			await handleFolders(`${path}/${object}`, objects[object]);
 		} else {
 			fs.writeFileSync(`${path}/${object}`, objects[object]);
@@ -72,7 +74,9 @@ async function handleFolders(path, objects) {
 async function unhandleFolders(path, objects) {
 	if (!path) return "";
 	for (let object of objects) {
+		if (params.values.loghandled) console.info("[inf]", object, "removing from", path);
 		if (typeof objects[object] == "object") {
+			if (params.values.loghandled) console.info("[inf]", object, "is a folder in", path);
 			await unhandleFolders(`${path}/${object}`, objects[object]);
 		} else {
 			fs.rmSync(`${path}/${object}`, {
@@ -87,6 +91,7 @@ async function handleSymlinks(path, links, path2 = `${os.homedir()}/.local/bin/`
 	if (!path) return "";
 	let allLinks = [];
 	for (let object of links) {
+		if (params.values.loghandled) console.info("[inf]", object, "symlink", path, "->", path2);
 		fs.symlinkSync(`${path}/${object}`, `${path2.endsWith("/")?path2:path2+"/"}${object}`);
 		allLinks.push(`${path2.endsWith("/")?path2:path2+"/"}${object}`);
 	}
@@ -115,7 +120,11 @@ if (!params.values.hideoem) console.info("[inf] ");
 				console.log("Installing global configs...");
 				delete config.failedToLoad;
 				fs.writeFileSync(__dirname + "/duckpm-global-config.json", JSON.stringify(config, null, "\t"));
-				fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", "{}");
+				fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify({
+					installed: {},
+					cachedpackages: {},
+					packageList: {}
+				}, null, "\t"));
 			} else if (config.userFailedToLoad) {
 				console.log("Seems like the user config wasn't initialized. Let's do that.");
 				fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify({
@@ -320,6 +329,7 @@ if (!params.values.hideoem) console.info("[inf] ");
 		console.info("[inf]                          --noinstall   - Do not install packages on FS");
 		console.info("[inf]                                          instead try out what changes");
 		console.info("[inf]                                          will be made.");
+		console.info("[inf]                          --nosymlink   - Do not create symlinks.");
 		console.info("[inf]        remove [package] .............. - removes a package");
 		console.info("[inf]        delete                            (alias)");
 		console.info("[inf]        del                               (alias)");
@@ -346,6 +356,8 @@ if (!params.values.hideoem) console.info("[inf] ");
 		console.info("[inf]                                          all console interaction");
 		console.info("[inf]                          --hideoem     - Program-wide setting to remove");
 		console.info("[inf]                                          \"Made by PCsoft\" prompt");
+		console.info("[inf]                          --loghandled  - Program-wide setting to log every");
+		console.info("[inf]                                          file installing/uninstalling.");
 		console.info("[inf] More stuff coming soon.");
 		process.exit(1);
 	}
@@ -411,7 +423,7 @@ async function installpkg(pkg, quiet = false) {
 	eval(package.preinstall);
 	if (!params.values.noinstall) await handleFolders(".", package.files);
 	let symlinks = [];
-	if (params.values.path || process.platform == "linux" || process.platform == "android") {
+	if ((params.values.path || process.platform == "linux" || process.platform == "android") && !params.values.nosymlink) {
 		if (!quiet) console.info("[inf] Creating symlinks...");
 		if (!params.values.noinstall) symlinks = await handleSymlinks(process.cwd(), package.programMaps || [], params.values.path || `${os.homedir()}/.local/bin/`);
 	}
