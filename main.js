@@ -83,12 +83,12 @@ async function unhandleFolders(path, objects) {
 	}
 	return path;
 }
-async function handleSymlinks(path, links, path = `${os.homedir()}/.local/bin/`) {
+async function handleSymlinks(path, links, path2 = `${os.homedir()}/.local/bin/`) {
 	if (!path) return "";
 	let allLinks = [];
 	for (let object of links) {
-		fs.symlinkSync(`${path}/${object}`, `${path.endsWith("/")?path:path+"/"}${object}`);
-		allLinks.push(`${path.endsWith("/")?path:path+"/"}${object}`);
+		fs.symlinkSync(`${path}/${object}`, `${path2.endsWith("/")?path2:path2+"/"}${object}`);
+		allLinks.push(`${path2.endsWith("/")?path2:path2+"/"}${object}`);
 	}
 	return allLinks;
 }
