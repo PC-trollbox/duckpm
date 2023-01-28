@@ -1,5 +1,5 @@
 #!/bin/node
-const ver = "0.9.1";
+const ver = "0.10.0";
 const zlib = require('zlib');
 const util = require("util");
 const params = util.parseArgs({
@@ -155,7 +155,10 @@ if (!params.values.hideoem) console.info("[inf] ");
 			console.info("[inf] The available versions are: " + packagelist[parsed.package].join(", "));
 			return process.exit(1);
 		}
-		console.info("[inf] Caching " + params.positionals[1] + "...");
+		if (!parsed.version) {
+			parsed.version = packagelist[parsed.package][packagelist[parsed.package].length - 1];
+		}
+		console.info("[inf] Caching " + params.package + "...");
 		if (!config.failedToLoad) {
 			if (!config.cachedpackages || config.failedToLoad) {
 				let package;
@@ -401,9 +404,9 @@ async function installpkg(pkg, quiet = false) {
 	package = JSON.parse(package);
 	if (!quiet) console.info("[inf] Installing \"" + parsed.package + "@" + parsed.version + "\" from " + (iscache ? "local cache" : "remote") + "...");
 	eval(package.preinstall);
-	if (!params.values.noinstall) await handleFolders(params.values.path || ".", package.files);
+	if (!params.values.noinstall) await handleFolders(".", package.files);
 	let symlinks = [];
-	if (!params.values.path && (process.platform == "linux" || process.platform == "android")) {
+	if (params.values.path || process.platform == "linux" || process.platform == "android") {
 		if (!quiet) console.info("[inf] Creating symlinks...");
 		if (!params.values.noinstall) symlinks = await handleSymlinks(process.cwd(), package.programMaps || []);
 	}
