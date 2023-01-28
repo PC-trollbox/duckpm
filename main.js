@@ -1,6 +1,6 @@
 #!/bin/node
 
-const ver = "0.10.1";
+const ver = "0.10.2";
 const zlib = require('zlib');
 const util = require("util");
 const params = util.parseArgs({
@@ -163,7 +163,7 @@ if (!params.values.hideoem) console.info("[inf] ");
 		if (!parsed.version) {
 			parsed.version = packagelist[parsed.package][packagelist[parsed.package].length - 1];
 		}
-		console.info(`[inf] Caching ${params.package}...`);
+		console.info(`[inf] Caching ${parsed.package}...`);
 		if (!config.failedToLoad) {
 			if (!config.cachedpackages || config.failedToLoad) {
 				let package;
