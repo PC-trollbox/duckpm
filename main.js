@@ -1,5 +1,6 @@
 #!/bin/node
-const ver = "0.10.0";
+
+const ver = "0.10.1";
 const zlib = require('zlib');
 const util = require("util");
 const params = util.parseArgs({
@@ -27,7 +28,7 @@ if (params.values.quiet) {
 	}
 }
 if (!params.values.hideoem) {
-	console.info("[inf] duckpm v" + ver);
+	console.info(`[inf] duckpm v${ver}`);
 	console.info("[inf] Made by PCsoft");
 }
 let userconfig = {};
@@ -41,7 +42,7 @@ function reloadUserConfig(quiet = false) {
 					if (config.allowOverrideByUser) {
 						config[key] = userconfig[key];
 					} else {
-						if (!quiet) console.warn("[wrn] Attempted to use local config's \"" + key + "\" but already defined by global config!")
+						if (!quiet) console.warn(`[wrn] Attempted to use local config's \"${key}\" but already defined by global config!`)
 					}
 				} else {
 					config[key] = userconfig[key];
@@ -82,12 +83,12 @@ async function unhandleFolders(path, objects) {
 	}
 	return path;
 }
-async function handleSymlinks(path, links) {
+async function handleSymlinks(path, links, path = `${os.homedir()}/.local/bin/`) {
 	if (!path) return "";
 	let allLinks = [];
 	for (let object of links) {
-		fs.symlinkSync(`${path}/${object}`, `${os.homedir()}/.local/bin/${object}`);
-		allLinks.push(`${os.homedir()}/.local/bin/${object}`);
+		fs.symlinkSync(`${path}/${object}`, `${path.endsWith("/")?path:path+"/"}${object}`);
+		allLinks.push(`${path.endsWith("/")?path:path+"/"}${object}`);
 	}
 	return allLinks;
 }
@@ -106,8 +107,8 @@ if (!params.values.hideoem) console.info("[inf] ");
 
 (async function Core() {
 	if (params.positionals[0] == "install" || params.positionals[0] == "i") {
-		if (params.values.itself || ((params.positionals[1] == "duckpm@" + ver || params.positionals[1] == "duckpm") && !params.values.server)) {
-			console.info("[inf] Installing \"duckpm@" + ver + "\" from local cache...");
+		if (params.values.itself || ((params.positionals[1] == `duckpm@${ver}` || params.positionals[1] == "duckpm") && !params.values.server)) {
+			console.info(`[inf] Installing \"duckpm@${ver}\" from local cache...`);
 			if (config.failedToLoad && !config.userFailedToLoad) {
 				console.log("The new serverLocation will be set to https://verylargecollectionof.unexistentpackages.com/quack/.");
 				console.log("The local config settings cannot modify global settings by default. Change allowOverrideByUser to allow that.")
@@ -117,7 +118,11 @@ if (!params.values.hideoem) console.info("[inf] ");
 				fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", "{}");
 			} else if (config.userFailedToLoad) {
 				console.log("Seems like the user config wasn't initialized. Let's do that.");
-				fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", "{}");
+				fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify({
+					installed: {},
+					cachedpackages: {},
+					packageList: {}
+				}, null, "\t"));
 			}
 			console.info("[inf] \"duckpm\" installed successfully!");
 		} else {
@@ -147,36 +152,36 @@ if (!params.values.hideoem) console.info("[inf] ");
 			console.info("[inf] Using cached list, use duckpm update to update.")
 		}
 		if (!packagelist.hasOwnProperty(parsed.package)) {
-			console.error("[err] Couldn't find \"" + (parsed.package || "") + "\" on the server.");
+			console.error(`[err] Couldn't find \"${parsed.package || ""}\" on the server.`);
 			return process.exit(1);
 		}
 		if (!packagelist[parsed.package].includes(parsed.version) && parsed.version) {
-			console.error("[err] Couldn't find version \"" + parsed.version + "\" of package \"" + (parsed.package || "") + "\" on the server, however there are other versions available.");
-			console.info("[inf] The available versions are: " + packagelist[parsed.package].join(", "));
+			console.error(`[err] Couldn't find version \"${parsed.version}\" of package \"${parsed.package || ""}\" on the server, however there are other versions available.`);
+			console.info(`[inf] The available versions are: ${packagelist[parsed.package].join(", ")}`);
 			return process.exit(1);
 		}
 		if (!parsed.version) {
 			parsed.version = packagelist[parsed.package][packagelist[parsed.package].length - 1];
 		}
-		console.info("[inf] Caching " + params.package + "...");
+		console.info(`[inf] Caching ${params.package}...`);
 		if (!config.failedToLoad) {
 			if (!config.cachedpackages || config.failedToLoad) {
 				let package;
-				package = await fetch(config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/") + "get?package=" + encodeURIComponent(parsed.package) + "&version=" + encodeURIComponent(parsed.version));
+				package = await fetch(`${config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/")}get?package=${encodeURIComponent(parsed.package)}&version=${encodeURIComponent(parsed.version)}`);
 				package = await package.arrayBuffer();
 				package = Buffer.from(new Uint8Array(package));
 				if (!config.failedToLoad) {
 					userconfig.cachedpackages = {};
-					userconfig.cachedpackages[parsed.package + "@" + parsed.version] = package.toString("base64");
+					userconfig.cachedpackages[`${parsed.package}@${parsed.version}`] = package.toString("base64");
 					reloadUserConfig(true);
 					if (!params.values.noinstall) fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
 				}
-			} else if (!config.cachedpackages.hasOwnProperty(parsed.package + "@" + parsed.version)) {
+			} else if (!config.cachedpackages.hasOwnProperty(`${parsed.package}@${parsed.version}`)) {
 				let package;
-				package = await fetch(config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/") + "get?package=" + encodeURIComponent(parsed.package) + "&version=" + encodeURIComponent(parsed.version));
+				package = await fetch(`${config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/")}get?package=${encodeURIComponent(parsed.package)}&version=${encodeURIComponent(parsed.version)}`);
 				package = await package.arrayBuffer();
 				package = Buffer.from(new Uint8Array(package));
-				userconfig.cachedpackages[parsed.package + "@" + parsed.version] = package.toString("base64");
+				userconfig.cachedpackages[`${parsed.package}@${parsed.version}`] = package.toString("base64");
 				reloadUserConfig(true);
 				if (!params.values.noinstall) fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
 			}
@@ -184,7 +189,7 @@ if (!params.values.hideoem) console.info("[inf] ");
 		console.info("[inf] Cached successfully!");
 	} else if (params.positionals[0] == "remove" || params.positionals[0] == "delete" || params.positionals[0] == "del" || params.positionals[0] == "rm" || params.positionals[0] == "uninstall") {
 		if (params.values.itself) {
-			console.info("[inf] Removing \"duckpm@" + ver + "\"...");
+			console.info(`[inf] Removing \"duckpm@${ver}\"...`);
 			if (config.failedToLoad) {
 				console.log("No need to remove the config: couldn't load one.");
 			} else {
@@ -198,10 +203,10 @@ if (!params.values.hideoem) console.info("[inf] ");
 				console.error("[err] You haven't installed anything yet.");
 				return process.exit(1);
 			} else if (!userconfig.installed.hasOwnProperty(params.positionals[1])) {
-				console.error("[err] Couldn't find \"" + params.positionals[1] + "\" on your computer. Make sure to specify the version of the software you're uninstalling.");
+				console.error(`[err] Couldn't find \"${params.positionals[1]}\" on your computer. Make sure to specify the version of the software you're uninstalling.`);
 				return process.exit(1);
 			} else {
-				console.info("[inf] Removing \"" + params.positionals[1] + "\"...");
+				console.info(`[inf] Removing \"${params.positionals[1]}\"...`);
 				eval(userconfig.installed[params.positionals[1]].removescripts.preremove);
 				let files = userconfig.installed[params.positionals[1]].fs;
 				if (!params.values.nofile) {
@@ -214,8 +219,8 @@ if (!params.values.hideoem) console.info("[inf] ");
 					console.info("[inf] Removing files...");
 					await unhandleFolders(userconfig.installed[params.positionals[1]].path, files);
 				} else {
-					console.warn("[wrn] Following symlinks need to be removed: " + userconfig.installed[params.positionals[1]].symlinks.join(", "));
-					console.warn("[wrn] Following files need to be removed:    " + userconfig.installed[params.positionals[1]].path + "/" + userconfig.installed[params.positionals[1]].fs.join(", " + userconfig.installed[params.positionals[1]].path + "/"));
+					console.warn(`[wrn] Following symlinks need to be removed: ${userconfig.installed[params.positionals[1]].symlinks.join(", ")}`);
+					console.warn(`[wrn] Following files need to be removed:    ${userconfig.installed[params.positionals[1]].path}/${userconfig.installed[params.positionals[1]].fs.join(`, ${userconfig.installed[params.positionals[1]].path}/`)}`);
 				}
 				console.info("[inf] Removing uninstallation information...");
 				let postrem = userconfig.installed[params.positionals[1]].removescripts.postremove;
@@ -223,7 +228,7 @@ if (!params.values.hideoem) console.info("[inf] ");
 				fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
 				reloadUserConfig(true);
 				eval(postrem);
-				console.info("[inf] \"" + params.positionals[1] + "\" removed successfully!");
+				console.info(`[inf] \"${params.positionals[1]}\" removed successfully!`);
 			}
 		}
 	} else if (params.positionals[0] == "update") {
@@ -258,7 +263,7 @@ if (!params.values.hideoem) console.info("[inf] ");
 	} else if (params.positionals[0] == "listpkg") {
 		console.info("[inf] Installed package list (with versions):");
 		for (let pkg in config.installed) {
-			console.info("[inf] " + pkg + " - installed");
+			console.info(`[inf] ${pkg} - installed`);
 		}
 	} else if (params.positionals[0] == "listonlpkg") {
 		console.info("[inf] Online package list (with versions):");
@@ -278,13 +283,13 @@ if (!params.values.hideoem) console.info("[inf] ");
 		for (let pkg in packagelist) {
 			for (let ver of packagelist[pkg]) {
 				if (config.installed) {
-					if (config.installed.hasOwnProperty(pkg + "@" + ver)) {
-						console.info("[inf] " + pkg + "@" + ver + " - installed");
+					if (config.installed.hasOwnProperty(`${pkg}@${ver}`)) {
+						console.info(`[inf] ${pkg}@${ver} - installed`);
 					} else {
-						console.info("[inf] " + pkg + "@" + ver + " - not installed");
+						console.info(`[inf] ${pkg}@${ver} - not installed`);
 					}
 				} else {
-					console.info("[inf] " + pkg + "@" + ver + " - undefined");
+					console.info(`[inf] ${pkg}@${ver} - undefined`);
 				}
 			}
 		}
@@ -292,9 +297,9 @@ if (!params.values.hideoem) console.info("[inf] ");
 		console.info("[inf] Downloaded package list (with versions):");
 		for (let pkg in config.cachedpackages) {
 			if (config.installed.hasOwnProperty(pkg)) {
-				console.info("[inf] " + pkg + " - installed");
+				console.info(`[inf] ${pkg} - installed`);
 			} else {
-				console.info("[inf] " + pkg + " - not installed");
+				console.info(`[inf] ${pkg} - not installed`);
 			}
 		}
 	} else if (params.positionals[0] == "noop") {} else {
@@ -366,12 +371,12 @@ async function installpkg(pkg, quiet = false) {
 		if (!quiet) console.info("[inf] Using cached list, use duckpm update to update.")
 	}
 	if (!packagelist.hasOwnProperty(parsed.package)) {
-		console.error("[err] Couldn't find \"" + (parsed.package || "") + "\" on the server.");
+		console.error(`[err] Couldn't find \"${parsed.package || ""}\" on the server.`);
 		return process.exit(1);
 	}
 	if (!packagelist[parsed.package].includes(parsed.version) && parsed.version) {
-		console.error("[err] Couldn't find version \"" + parsed.version + "\" of package \"" + (parsed.package || "") + "\" on the server, however there are other versions available.");
-		if (!quiet) console.info("[inf] The available versions are: " + packagelist[parsed.package].join(", "));
+		console.error(`[err] Couldn't find version \"${parsed.version}\" of package \"${parsed.package || ""}\" on the server, however there are other versions available.`);
+		if (!quiet) console.info(`[inf] The available versions are: ${packagelist[parsed.package].join(", ")}`);
 		return process.exit(1);
 	}
 	if (!parsed.version) {
@@ -380,42 +385,42 @@ async function installpkg(pkg, quiet = false) {
 	let package;
 	let iscache = false;
 	if (!config.cachedpackages || config.failedToLoad) {
-		package = await fetch(config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/") + "get?package=" + encodeURIComponent(parsed.package) + "&version=" + encodeURIComponent(parsed.version));
+		package = await fetch(`${config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/")}get?package=${encodeURIComponent(parsed.package)}&version=${encodeURIComponent(parsed.version)}`);
 		package = await package.arrayBuffer();
 		package = Buffer.from(new Uint8Array(package));
 		if (!config.failedToLoad) {
 			userconfig.cachedpackages = {};
-			userconfig.cachedpackages[parsed.package + "@" + parsed.version] = package.toString("base64");
+			userconfig.cachedpackages[`${parsed.package}@${parsed.version}`] = package.toString("base64");
 			reloadUserConfig(true);
 			if (!params.values.noinstall) fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
 		}
-	} else if (!config.cachedpackages.hasOwnProperty(parsed.package + "@" + parsed.version)) {
-		package = await fetch(config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/") + "get?package=" + encodeURIComponent(parsed.package) + "&version=" + encodeURIComponent(parsed.version));
+	} else if (!config.cachedpackages.hasOwnProperty(`${parsed.package}@${parsed.version}`)) {
+		package = await fetch(`${config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/")}get?package=${encodeURIComponent(parsed.package)}&version=${encodeURIComponent(parsed.version)}`);
 		package = await package.arrayBuffer();
 		package = Buffer.from(new Uint8Array(package));
-		userconfig.cachedpackages[parsed.package + "@" + parsed.version] = package.toString("base64");
+		userconfig.cachedpackages[`${parsed.package}@${parsed.version}`] = package.toString("base64");
 		reloadUserConfig(true);
 		if (!params.values.noinstall) fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
 	} else {
 		iscache = true;
-		package = Buffer.from(config.cachedpackages[parsed.package + "@" + parsed.version], "base64");
+		package = Buffer.from(config.cachedpackages[`${parsed.package}@${parsed.version}`], "base64");
 	}
 	package = zlib.inflateSync(package).toString();
 	package = JSON.parse(package);
-	if (!quiet) console.info("[inf] Installing \"" + parsed.package + "@" + parsed.version + "\" from " + (iscache ? "local cache" : "remote") + "...");
+	if (!quiet) console.info(`[inf] Installing \"${parsed.package}@${parsed.version}\" from ${iscache ? "local cache" : "remote"}...`);
 	eval(package.preinstall);
 	if (!params.values.noinstall) await handleFolders(".", package.files);
 	let symlinks = [];
 	if (params.values.path || process.platform == "linux" || process.platform == "android") {
 		if (!quiet) console.info("[inf] Creating symlinks...");
-		if (!params.values.noinstall) symlinks = await handleSymlinks(process.cwd(), package.programMaps || []);
+		if (!params.values.noinstall) symlinks = await handleSymlinks(process.cwd(), package.programMaps || [], params.values.path || `${os.homedir()}/.local/bin/`);
 	}
 	if (!quiet) console.info("[inf] Writing uninstallation information...")
 	if (!userconfig.installed) {
 		userconfig.installed = {};
 	} else {}
 	if (!config.failedToLoad) {
-		userconfig.installed[parsed.package + "@" + parsed.version] = {
+		userconfig.installed[`${parsed.package}@${parsed.version}`] = {
 			symlinks: symlinks,
 			fs: Object.keys(package.files),
 			path: (params.values.path || process.cwd()),
@@ -433,12 +438,12 @@ async function installpkg(pkg, quiet = false) {
 	if (package.dependencies) {
 		for (let dep of package.dependencies) {
 			if (isInstalled(dep, config.installed)) continue;
-			console.info("[inf] Installing missing dependency \"" + dep + "\"...");
+			console.info(`[inf] Installing missing dependency \"${dep}\"...`);
 			await installpkg(dep, true);
 		}
 	}
 	eval(package.postinstall);
-	if (!quiet) console.info("[inf] \"" + parsed.package + "\" installed successfully!");
+	if (!quiet) console.info(`[inf] \"${parsed.package}\" installed successfully!`);
 }
 
 function isInstalled(p, c) {
