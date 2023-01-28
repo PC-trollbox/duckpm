@@ -1,4 +1,5 @@
-const ver = "0.9.0";
+#!/bin/node
+const ver = "0.9.1";
 const zlib = require('zlib');
 const util = require("util");
 const params = util.parseArgs({
