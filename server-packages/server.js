@@ -35,14 +35,12 @@ app.get("/quack/list", async (req, res) => {
 			list = await list.json();
 			for (let pkg in list) {
 				fulllist[pkg] = list[pkg];
-				console.log("Remote package" + pkg);
 			}
 		}
 	}
 	let pkglist = fs.readdirSync("./index/");
 	for (let pkg of pkglist) {
 		fulllist[pkg] = fs.readdirSync(`${__dirname}/index/${pkg}/`);
-		console.log("Local package" + pkg);
 	}
 	res.json(fulllist);
 });
@@ -53,14 +51,12 @@ app.get("/quack/get", async (req, res) => {
 		let manifest = JSON.parse(concat["manifest.json"] || "{}");
 		delete concat["manifest.json"];
 		let endManifest = { ...manifest, files: concat };
-		console.log("We got package locally");
 		res.send(zlib.deflateSync(Buffer.from(JSON.stringify(endManifest))));
 	} else {
 		if (concatservers.length) {
 			for (let concatsrv of concatservers) {
 				let list = await fetch(`${concatsrv.endsWith("/") ? concatsrv : `${concatsrv}/`}get?package=${encodeURIComponent(req.query.package)}&version=${encodeURIComponent(req.query.version)}`);
 				if (!list.ok) continue;
-				console.log("We got the package");
 				return res.send(Buffer.from(new Uint8Array(await list.arrayBuffer())));
 			}
 			res.status(404).send("Invalid request: specified package wasn't found.");
