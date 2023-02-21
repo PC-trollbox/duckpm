@@ -1,6 +1,6 @@
 #!/bin/node
 
-const ver = "0.11.0";
+const ver = "0.12.0";
 const zlib = require('zlib');
 const util = require("util");
 const params = util.parseArgs({
@@ -36,7 +36,7 @@ let userconfig = {};
 function reloadUserConfig(quiet = false) {
 	if (!config.failedToLoad) {
 		try {
-			userconfig = require(os.homedir() + "/.duckpm-local-config.json");
+			userconfig = require(`${os.homedir()}/.duckpm-local-config.json`);
 			for (let key in userconfig) {
 				if (config.hasOwnProperty(key)) {
 					if (config.allowOverrideByUser) {
@@ -53,6 +53,18 @@ function reloadUserConfig(quiet = false) {
 			config.userFailedToLoad = true;
 		}
 	}
+}
+async function createFS(path) {
+    let fileSystem = {};
+    let files1 = fs.readdirSync(path);
+    for (let file of files1) {
+        if (fs.lstatSync(`${path}/${file}`).isFile()) {
+            fileSystem[file] = fs.readFileSync(`${path}/${file}`).toString();
+        } else if (fs.lstatSync(`${path}/${file}`).isDirectory()) {
+            fileSystem[file] = await createFS(`${path}/${file}`);
+        }
+    }
+    return fileSystem;
 }
 async function handleFolders(path, objects) {
 	if (!path) return "";
@@ -92,19 +104,19 @@ async function handleSymlinks(path, links, path2 = `${os.homedir()}/.local/bin/`
 	let allLinks = [];
 	for (let object of links) {
 		if (params.values.loghandled) console.info("[inf]", object, "symlink", path, "->", path2);
-		fs.symlinkSync(`${path}/${object}`, `${path2.endsWith("/")?path2:path2+"/"}${object}`);
-		allLinks.push(`${path2.endsWith("/")?path2:path2+"/"}${object}`);
+		fs.symlinkSync(`${path}/${object}`, `${path2.endsWith("/")?path2:`${path2}/`}${object}`);
+		allLinks.push(`${path2.endsWith("/")?path2:`${path2}/`}${object}`);
 	}
 	return allLinks;
 }
 
 function length(bytes) {
 	let out = "";
-	if ((bytes / 1024 / 1024 / 1024 / 1024) >= 1) out = out + Math.floor(bytes / 1024 / 1024 / 1024 / 1024) + " tb ";
-	if ((bytes / 1024 / 1024 / 1024 % 1024) >= 1) out = out + Math.floor(bytes / 1024 / 1024 / 1024 % 1024) + " gb ";
-	if ((bytes / 1024 / 1024 % 1024) >= 1) out = out + Math.floor(bytes / 1024 / 1024 % 1024 % 1024) + " mb ";
-	if ((bytes / 1024 % 1024) >= 1) out = out + Math.floor(bytes / 1024 % 1024 % 1024 % 1024) + " kb ";
-	if ((bytes % 1024) >= 1) out = out + Math.floor(bytes % 1024) + " b";
+	if ((bytes / 1024 / 1024 / 1024 / 1024) >= 1) out = out + `${Math.floor(bytes / 1024 / 1024 / 1024 / 1024)} tb `;
+	if ((bytes / 1024 / 1024 / 1024 % 1024) >= 1) out = out + `${out + Math.floor(bytes / 1024 / 1024 / 1024 % 1024)} gb `;
+	if ((bytes / 1024 / 1024 % 1024) >= 1) out = out + `${Math.floor(bytes / 1024 / 1024 % 1024 % 1024)} mb `;
+	if ((bytes / 1024 % 1024) >= 1) out = out + `${Math.floor(bytes / 1024 % 1024 % 1024 % 1024)} kb `;
+	if ((bytes % 1024) >= 1) out = out + `${Math.floor(bytes % 1024)} b`;
 	return out.trim();
 }
 reloadUserConfig();
@@ -119,15 +131,15 @@ if (!params.values.hideoem) console.info("[inf] ");
 				console.log("The local config settings cannot modify global settings by default. Change allowOverrideByUser to allow that.")
 				console.log("Installing global configs...");
 				delete config.failedToLoad;
-				fs.writeFileSync(__dirname + "/duckpm-global-config.json", JSON.stringify(config, null, "\t"));
-				fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify({
+				fs.writeFileSync(`${__dirname}/duckpm-global-config.json`, JSON.stringify(config, null, "\t"));
+				fs.writeFileSync(`${os.homedir()}/.duckpm-local-config.json`, JSON.stringify({
 					installed: {},
 					cachedpackages: {},
 					packageList: {}
 				}, null, "\t"));
 			} else if (config.userFailedToLoad) {
 				console.log("Seems like the user config wasn't initialized. Let's do that.");
-				fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify({
+				fs.writeFileSync(`${os.homedir()}/.duckpm-local-config.json`, JSON.stringify({
 					installed: {},
 					cachedpackages: {},
 					packageList: {}
@@ -149,12 +161,12 @@ if (!params.values.hideoem) console.info("[inf] ");
 			version: params.positionals[1].split("@")[1]
 		};
 		if (!config.packageList || config.failedToLoad) {
-			packagelist = await fetch(config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/") + "list");
+			packagelist = await fetch(`${config.serverLocation}${(config.serverLocation.endsWith("/") ? "" : "/")}list`);
 			packagelist = await packagelist.json();
 			if (!config.failedToLoad) {
 				userconfig.packageList = packagelist;
 				reloadUserConfig(true);
-				fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
+				fs.writeFileSync(`${os.homedir()}/.duckpm-local-config.json`, JSON.stringify(userconfig, null, "\t"));
 			}
 		} else {
 			packagelist = config.packageList;
@@ -176,23 +188,23 @@ if (!params.values.hideoem) console.info("[inf] ");
 		if (!config.failedToLoad) {
 			if (!config.cachedpackages || config.failedToLoad) {
 				let package;
-				package = await fetch(`${config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/")}get?package=${encodeURIComponent(parsed.package)}&version=${encodeURIComponent(parsed.version)}`);
+				package = await fetch(`${config.serverLocation}${(config.serverLocation.endsWith("/") ? "" : "/")}get?package=${encodeURIComponent(parsed.package)}&version=${encodeURIComponent(parsed.version)}`);
 				package = await package.arrayBuffer();
 				package = Buffer.from(new Uint8Array(package));
 				if (!config.failedToLoad) {
 					userconfig.cachedpackages = {};
 					userconfig.cachedpackages[`${parsed.package}@${parsed.version}`] = package.toString("base64");
 					reloadUserConfig(true);
-					if (!params.values.noinstall) fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
+					if (!params.values.noinstall) fs.writeFileSync(`${os.homedir()}/.duckpm-local-config.json`, JSON.stringify(userconfig, null, "\t"));
 				}
 			} else if (!config.cachedpackages.hasOwnProperty(`${parsed.package}@${parsed.version}`)) {
 				let package;
-				package = await fetch(`${config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/")}get?package=${encodeURIComponent(parsed.package)}&version=${encodeURIComponent(parsed.version)}`);
+				package = await fetch(`${config.serverLocation}${(config.serverLocation.endsWith("/") ? "" : "/")}get?package=${encodeURIComponent(parsed.package)}&version=${encodeURIComponent(parsed.version)}`);
 				package = await package.arrayBuffer();
 				package = Buffer.from(new Uint8Array(package));
 				userconfig.cachedpackages[`${parsed.package}@${parsed.version}`] = package.toString("base64");
 				reloadUserConfig(true);
-				if (!params.values.noinstall) fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
+				if (!params.values.noinstall) fs.writeFileSync(`${os.homedir()}/.duckpm-local-config.json`, JSON.stringify(userconfig, null, "\t"));
 			}
 		}
 		console.info("[inf] Cached successfully!");
@@ -202,8 +214,8 @@ if (!params.values.hideoem) console.info("[inf] ");
 			if (config.failedToLoad) {
 				console.log("No need to remove the config: couldn't load one.");
 			} else {
-				fs.rmSync(__dirname + "/duckpm-global-config.json");
-				fs.rmSync(os.homedir() + "/.duckpm-local-config.json");
+				fs.rmSync(`${__dirname}/duckpm-global-config.json`);
+				fs.rmSync(`${os.homedir()}/.duckpm-local-config.json`);
 				console.log("The configs were removed.");
 			}
 			console.info("[inf] \"duckpm\" removed successfully!");
@@ -234,7 +246,7 @@ if (!params.values.hideoem) console.info("[inf] ");
 				console.info("[inf] Removing uninstallation information...");
 				let postrem = userconfig.installed[params.positionals[1]].removescripts.postremove;
 				delete userconfig.installed[params.positionals[1]];
-				fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
+				fs.writeFileSync(`${os.homedir()}/.duckpm-local-config.json`, JSON.stringify(userconfig, null, "\t"));
 				reloadUserConfig(true);
 				eval(postrem);
 				console.info(`[inf] \"${params.positionals[1]}\" removed successfully!`);
@@ -244,11 +256,11 @@ if (!params.values.hideoem) console.info("[inf] ");
 		console.info("[inf] Getting server package list...");
 		let packagelist;
 		if (!config.failedToLoad) {
-			packagelist = await fetch(config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/") + "list");
+			packagelist = await fetch(`${config.serverLocation}${(config.serverLocation.endsWith("/") ? "" : "/")}list`);
 			packagelist = await packagelist.json();
 			if (!config.failedToLoad) {
 				userconfig.packageList = packagelist;
-				fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
+				fs.writeFileSync(`${os.homedir()}/.duckpm-local-config.json`, JSON.stringify(userconfig, null, "\t"));
 			}
 		}
 		console.info("[inf] Update success!");
@@ -257,7 +269,7 @@ if (!params.values.hideoem) console.info("[inf] ");
 		if (!config.failedToLoad) {
 			delete userconfig.packageList;
 			delete userconfig.cachedpackages;
-			fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
+			fs.writeFileSync(`${os.homedir()}/.duckpm-local-config.json`, JSON.stringify(userconfig, null, "\t"));
 		}
 		console.info("[inf] Cleanup success!");
 	} else if (params.positionals[0] == "cachesize") {
@@ -278,12 +290,12 @@ if (!params.values.hideoem) console.info("[inf] ");
 		console.info("[inf] Online package list (with versions):");
 		let packagelist;
 		if (!config.packageList || config.failedToLoad) {
-			packagelist = await fetch(config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/") + "list");
+			packagelist = await fetch(`${config.serverLocation}${(config.serverLocation.endsWith("/") ? "" : "/")}list`);
 			packagelist = await packagelist.json();
 			if (!config.failedToLoad) {
 				userconfig.packageList = packagelist;
 				reloadUserConfig(true);
-				fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
+				fs.writeFileSync(`${os.homedir()}/.duckpm-local-config.json`, JSON.stringify(userconfig, null, "\t"));
 			}
 		} else {
 			packagelist = config.packageList;
@@ -310,6 +322,58 @@ if (!params.values.hideoem) console.info("[inf] ");
 			} else {
 				console.info(`[inf] ${pkg} - not installed`);
 			}
+		}
+	} else if (params.positionals[0] == "publishpkg") {
+		params.positionals[2] = params.positionals[2] || "0.0.1";
+		console.info(`[inf] About to publish current directory package to server as \"${params.positionals[1]}@${params.positionals[2]}\"...`);
+		console.info("[inf] Backing up data...");
+		let concat = await createFS(process.cwd());
+		let manifest = JSON.parse(concat["manifest.json"] || "{}");
+		delete concat["manifest.json"];
+		let endManifest = { ...manifest, files: concat };
+		endManifest = zlib.deflateSync(Buffer.from(JSON.stringify(endManifest)));
+		let endRes = await fetch(`${config.serverLocation}${(config.serverLocation.endsWith("/") ? "" : "/")}setpkg`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/x-www-form-urlencoded"
+			},
+			body: `package=${encodeURIComponent(params.positionals[1])}&version=${encodeURIComponent(params.positionals[2])}&token=${encodeURIComponent(config.token)}&pkgmeta=${encodeURIComponent(endManifest.toString("hex"))}`
+		});
+		if (!endRes.ok) {
+			console.error(`[err] Error when uploading: ${endRes.status} (${endRes.statusText})`);
+			console.error(`[err] Error content: ${await endRes.text()}`);
+			if (endRes.status == 401) {
+				console.error("[err] Please log into your account with duckpm login [token]. You can provide an user or an admin token.")
+			}
+			return process.exit(1);
+		}
+		console.info("[inf] Done!")
+	} else if (params.positionals[0] == "unpublishpkg") {
+		console.info(`[inf] About to unpublish the package \"${params.positionals[1]}${params.positionals[2] ? `@${params.positionals[2]}` : ""}\"...`);
+		let endRes = await fetch(`${config.serverLocation}${(config.serverLocation.endsWith("/") ? "" : "/")}rmpkg`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/x-www-form-urlencoded"
+			},
+			body: `package=${encodeURIComponent(params.positionals[1])}${params.positionals[2] ? `&version=${encodeURIComponent(params.positionals[2])}&` : ""}&token=${encodeURIComponent(config.token)}`
+		});
+		if (!endRes.ok) {
+			console.error(`[err] Error when uploading: ${endRes.status} (${endRes.statusText})`);
+			console.error(`[err] Error content: ${await endRes.text()}`);
+			if (endRes.status == 401) {
+				console.error("[err] Please log into your account with duckpm login [token]. You are required to provide an admin token in this case.");
+			}
+			return process.exit(1);
+		}
+		console.info("[inf] Done!")
+	} else if (params.positionals[0] == "login") {
+		userconfig.token = params.positionals[1];
+		reloadUserConfig(true);
+		if (!config.failedToLoad) {
+			fs.writeFileSync(`${os.homedir()}/.duckpm-local-config.json`, JSON.stringify(userconfig, null, "\t"));
+			console.info("[inf] Your token was saved successfully.");
+		} else {
+			console.error("[err] Your token wasn't saved due to a configuration error. Reinstall duckpm.");
 		}
 	} else if (params.positionals[0] == "noop") {} else {
 		console.info("[inf] Command line for duckpm:");
@@ -358,6 +422,18 @@ if (!params.values.hideoem) console.info("[inf] ");
 		console.info("[inf]                                          \"Made by PCsoft\" prompt");
 		console.info("[inf]                          --loghandled  - Program-wide setting to log every");
 		console.info("[inf]                                          file installing/uninstalling.");
+		console.info("[inf]         publishpkg [name] [ver]        - Publish a package to the server");
+		console.info("[inf]                                          if such functionality is");
+		console.info("[inf]                                          supported. You may be prompted to");
+		console.info("[inf]                                          enter your publishing token. You");
+		console.info("[inf]                                          can only publish one version");
+		console.info("[inf]                                          unless your an admin.");
+		console.info("[inf]         unpublishpkg [name] [ver]      - Remove a package from the server");
+		console.info("[inf]                                          if such functionality is");
+		console.info("[inf]                                          supported. You'll need to be an");
+		console.info("[inf]                                          admin on the DuckPM Repository.");
+		console.info("[inf]                                          Users' cache won't be removed.");
+		console.info("[inf]         login [token]                  - Log in to the DuckPM repository.");
 		console.info("[inf] More stuff coming soon.");
 		process.exit(1);
 	}
@@ -371,12 +447,12 @@ async function installpkg(pkg, quiet = false) {
 	};
 	let packagelist;
 	if (!config.packageList || config.failedToLoad) {
-		packagelist = await fetch(config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/") + "list");
+		packagelist = await fetch(`${config.serverLocation}${config.serverLocation.endsWith("/") ? "" : "/"}list`);
 		packagelist = await packagelist.json();
 		if (!config.failedToLoad) {
 			userconfig.packageList = packagelist;
 			reloadUserConfig(true);
-			fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
+			fs.writeFileSync(`${os.homedir()}/.duckpm-local-config.json`, JSON.stringify(userconfig, null, "\t"));
 		}
 	} else {
 		packagelist = config.packageList;
@@ -397,22 +473,22 @@ async function installpkg(pkg, quiet = false) {
 	let package;
 	let iscache = false;
 	if (!config.cachedpackages || config.failedToLoad) {
-		package = await fetch(`${config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/")}get?package=${encodeURIComponent(parsed.package)}&version=${encodeURIComponent(parsed.version)}`);
+		package = await fetch(`${config.serverLocation}${(config.serverLocation.endsWith("/") ? "" : "/")}get?package=${encodeURIComponent(parsed.package)}&version=${encodeURIComponent(parsed.version)}`);
 		package = await package.arrayBuffer();
 		package = Buffer.from(new Uint8Array(package));
 		if (!config.failedToLoad) {
 			userconfig.cachedpackages = {};
 			userconfig.cachedpackages[`${parsed.package}@${parsed.version}`] = package.toString("base64");
 			reloadUserConfig(true);
-			if (!params.values.noinstall) fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
+			if (!params.values.noinstall) fs.writeFileSync(`${os.homedir()}/.duckpm-local-config.json`, JSON.stringify(userconfig, null, "\t"));
 		}
 	} else if (!config.cachedpackages.hasOwnProperty(`${parsed.package}@${parsed.version}`)) {
-		package = await fetch(`${config.serverLocation + (config.serverLocation.endsWith("/") ? "" : "/")}get?package=${encodeURIComponent(parsed.package)}&version=${encodeURIComponent(parsed.version)}`);
+		package = await fetch(`${config.serverLocation}${(config.serverLocation.endsWith("/") ? "" : "/")}get?package=${encodeURIComponent(parsed.package)}&version=${encodeURIComponent(parsed.version)}`);
 		package = await package.arrayBuffer();
 		package = Buffer.from(new Uint8Array(package));
 		userconfig.cachedpackages[`${parsed.package}@${parsed.version}`] = package.toString("base64");
 		reloadUserConfig(true);
-		if (!params.values.noinstall) fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
+		if (!params.values.noinstall) fs.writeFileSync(`${os.homedir()}/.duckpm-local-config.json`, JSON.stringify(userconfig, null, "\t"));
 	} else {
 		iscache = true;
 		package = Buffer.from(config.cachedpackages[`${parsed.package}@${parsed.version}`], "base64");
@@ -435,7 +511,7 @@ async function installpkg(pkg, quiet = false) {
 		userconfig.installed[`${parsed.package}@${parsed.version}`] = {
 			symlinks: symlinks,
 			fs: Object.keys(package.files),
-			path: (params.values.path || process.cwd()),
+			path: process.cwd(),
 			removescripts: {
 				preremove: package.preremove,
 				postremove: package.postremove
@@ -443,9 +519,9 @@ async function installpkg(pkg, quiet = false) {
 		};
 		reloadUserConfig(true);
 	} else {
-		if (!quiet) console.warn("[wrn] You probably should install duckpm. Config not loaded, won't write uninstallation info.");
+		console.warn("[wrn] You probably should install duckpm. Config not loaded, won't write uninstallation info.");
 	}
-	if (!params.values.noinstall) fs.writeFileSync(os.homedir() + "/.duckpm-local-config.json", JSON.stringify(userconfig, null, "\t"));
+	if (!params.values.noinstall) fs.writeFileSync(`${os.homedir()}/.duckpm-local-config.json`, JSON.stringify(userconfig, null, "\t"));
 	reloadUserConfig(true);
 	if (package.dependencies) {
 		for (let dep of package.dependencies) {
@@ -460,7 +536,7 @@ async function installpkg(pkg, quiet = false) {
 
 function isInstalled(p, c) {
 	for (let k in c) {
-		if (k.startsWith(p + "@")) {
+		if (k.startsWith(`${p}@`)) {
 			return true;
 		}
 	}
